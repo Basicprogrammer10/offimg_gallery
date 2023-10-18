@@ -1,7 +1,8 @@
+const OFFIMG_PATH = "offimg";
 const IMAGES_TAG = document.querySelector("[images]");
 const INFO_TAG = document.querySelector("[info]");
 
-fetch("out/info.json")
+fetch(`${OFFIMG_PATH}/info.json`)
   .then((d) => d.json())
   .then((d) => {
     for (let i of [
@@ -21,7 +22,7 @@ fetch("out/info.json")
 
       {
         let img = document.createElement("img");
-        img.src = `out/${i.id}.bmp`;
+        img.src = `${OFFIMG_PATH}/${i.id}.bmp`;
         img.alt = i.alt;
         image.appendChild(img);
       }
@@ -45,7 +46,7 @@ fetch("out/info.json")
         info.innerHTML += ` &bull; ${i.alt}`;
 
         let download = document.createElement("a");
-        download.href = `out/${i.id}.bmp`;
+        download.href = `${OFFIMG_PATH}/${i.id}.bmp`;
         download.innerHTML = `⇓`;
         download.download = `${i.alt}${i.alt.endsWith(".bmp") ? "" : ".bmp"}`;
 
