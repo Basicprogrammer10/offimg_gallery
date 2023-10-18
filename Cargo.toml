@@ -1,0 +1,13 @@
+[package]
+name = "offimg_gallery"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.75"
+indicatif = { version = "0.17.7", features = ["rayon"] }
+once_cell = "1.18.0"
+rayon = "1.8.0"
+scraper = "0.17.1"
+ureq = "2.8.0"
+url = "2.4.1"
