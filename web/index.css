@@ -1,0 +1,27 @@
+body {
+  margin-left: 1em;
+}
+
+hr {
+  margin-bottom: 1em;
+}
+
+[image] {
+  display: inline-block;
+  image-rendering: crisp-edges;
+  border: 1px solid black;
+  margin-right: 1em;
+  margin-bottom: 1em;
+  padding: 0.5em;
+}
+[image] [foot] {
+  max-width: 400px;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5em;
+}
+[image] [foot] * {
+  display: inline;
+}
+
+/*# sourceMappingURL=index.css.map */

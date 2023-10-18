@@ -16,6 +16,7 @@ use serde::Serialize;
 use serde_json::json;
 use tinybmp::{Bpp, RawBmp};
 use url::Url;
+use uuid::Uuid;
 
 const BASE_URL: &str = "https://forum.swissmicros.com";
 const OUT_DIR: &str = "out";
@@ -138,7 +139,7 @@ fn main() -> Result<()> {
                 return None;
             }
 
-            fs::write(format!("{OUT_DIR}/{}", x.filename), slice).unwrap();
+            fs::write(format!("{OUT_DIR}/{}.bmp", x.id), slice).unwrap();
             Some(x)
         })
         .collect::<Vec<_>>();
@@ -158,29 +159,17 @@ fn main() -> Result<()> {
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash)]
 struct ImageRef {
+    id: Uuid,
     post: u32,
     date: DateTime<Utc>,
     address: String,
     alt: Option<String>,
-    filename: String,
 }
 
 impl ImageRef {
     pub fn new(post: u32, date: DateTime<Utc>, address: String, alt: Option<String>) -> Self {
         Self {
-            filename: format!(
-                "{}-{}{}.bmp",
-                date.format("%Y-%m-%d_%H-%M-%S"),
-                post,
-                if let Some(i) = &alt {
-                    // todo: use some other encoding system as urlencoding messes stuff up in the requests
-                    // todo: maybe just an id?
-                    // like call enumerate on the iter
-                    String::from("-") + &urlencoding::encode(i)
-                } else {
-                    String::new()
-                }
-            ),
+            id: Uuid::new_v4(),
             post,
             date,
             address,
