@@ -1,4 +1,10 @@
-use std::{collections::HashSet, fs, path::Path};
+#![feature(file_create_new)]
+
+use std::{
+    collections::HashSet,
+    fs::{self, File},
+    path::Path,
+};
 
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
@@ -6,6 +12,8 @@ use embedded_graphics::prelude::Size;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use scraper::Html;
+use serde::Serialize;
+use serde_json::json;
 use tinybmp::{Bpp, RawBmp};
 use url::Url;
 
@@ -47,7 +55,7 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("Found {} posts", links.len());
+    println!("[*] Found {} posts", links.len());
     let images = links
         .par_iter()
         .progress_count(links.len() as u64)
@@ -95,12 +103,7 @@ fn main() -> Result<()> {
                             .unwrap()
                             .to_string();
                         let alt = image.value().attr("alt").map(|x| x.to_owned());
-                        images.push(ImageRef {
-                            post: post_id,
-                            date,
-                            address,
-                            alt,
-                        });
+                        images.push(ImageRef::new(post_id, date, address, alt));
                     }
                 }
 
@@ -113,24 +116,18 @@ fn main() -> Result<()> {
         })
         .collect::<Vec<_>>();
 
-    println!("Found {} images", images.len());
-    images
+    println!("[*] Found {} images", images.len());
+    let downloaded = images
         .par_iter()
         .progress_count(images.len() as u64)
-        .for_each(|x| {
+        .filter_map(|x| {
             let raw = match ureq::get(&x.address).call() {
                 Ok(x) => x,
-                Err(e) => {
-                    eprintln!("Failed to fetch image {}: {}", x.address, e);
-                    return;
-                }
+                Err(..) => return None,
             };
-            if raw.status() != 200 {
-                panic!("Failed to fetch image {}: {}", x.address, raw.status());
-            }
 
-            if raw.header("Content-Type").unwrap() != "image/bmp" {
-                return;
+            if raw.status() != 200 || raw.header("Content-Type").unwrap() != "image/bmp" {
+                return None;
             }
 
             let mut slice = Vec::new();
@@ -138,35 +135,58 @@ fn main() -> Result<()> {
 
             let bmp = RawBmp::from_slice(&slice).unwrap();
             if bmp.header().bpp != Bpp::Bits1 || bmp.header().image_size != Size::new(400, 240) {
-                return;
+                return None;
             }
 
-            fs::write(
-                format!(
-                    "{}/{}-{}{}.bmp",
-                    OUT_DIR,
-                    x.date.format("%Y-%m-%d_%H-%M-%S"),
-                    x.post,
-                    if let Some(i) = &x.alt {
-                        String::from("-") + &urlencoding::encode(i)
-                    } else {
-                        String::new()
-                    }
-                ),
-                slice,
-            )
-            .unwrap();
-        });
+            fs::write(format!("{OUT_DIR}/{}", x.filename), slice).unwrap();
+            Some(x)
+        })
+        .collect::<Vec<_>>();
 
+    println!("[*] Downloaded {} images", downloaded.len());
+    let date = chrono::offset::Local::now().with_timezone(&Utc);
+    let info_file = File::create_new(format!("{OUT_DIR}/info.json"))?;
+    serde_json::to_writer(
+        info_file,
+        &json!({
+            "date": date,
+            "images": downloaded
+        }),
+    )?;
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, PartialEq, Eq, Hash)]
 struct ImageRef {
     post: u32,
     date: DateTime<Utc>,
     address: String,
     alt: Option<String>,
+    filename: String,
+}
+
+impl ImageRef {
+    pub fn new(post: u32, date: DateTime<Utc>, address: String, alt: Option<String>) -> Self {
+        Self {
+            filename: format!(
+                "{}-{}{}.bmp",
+                date.format("%Y-%m-%d_%H-%M-%S"),
+                post,
+                if let Some(i) = &alt {
+                    // todo: use some other encoding system as urlencoding messes stuff up in the requests
+                    // todo: maybe just an id?
+                    // like call enumerate on the iter
+                    String::from("-") + &urlencoding::encode(i)
+                } else {
+                    String::new()
+                }
+            ),
+            post,
+            date,
+            address,
+            alt,
+        }
+    }
 }
 
 // All files: https://forum.swissmicros.com/download/file.php?id=<NUM>
