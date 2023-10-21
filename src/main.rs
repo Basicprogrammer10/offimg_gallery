@@ -21,6 +21,8 @@ use uuid::Uuid;
 const BASE_URL: &str = "https://forum.swissmicros.com";
 const OUT_DIR: &str = "out";
 
+const BMP_TYPES: &[&str] = &["image/bmp", "image/x-ms-bmp"];
+
 macro_rules! selector {
     ($raw:expr) => {{
         static SELECTOR: once_cell::sync::OnceCell<scraper::Selector> =
@@ -35,7 +37,7 @@ fn main() -> Result<()> {
         fs::create_dir(OUT_DIR)?;
     }
 
-    let mut links = HashSet::new();
+    let mut topics = HashSet::new();
     for page in 0.. {
         let url = format!("{BASE_URL}/viewforum.php?f=14&start={}", 25 * page);
         let res = ureq::get(&url).call()?;
@@ -49,17 +51,17 @@ fn main() -> Result<()> {
             .map(|x| x.value().attr("href").unwrap()[2..].to_owned())
             .collect::<Vec<_>>();
         let count = posts.len();
-        links.extend(posts);
+        topics.extend(posts);
 
         if count != 25 {
             break;
         }
     }
 
-    println!("[*] Found {} posts", links.len());
-    let images = links
+    println!("[*] Found {} posts", topics.len());
+    let images = topics
         .par_iter()
-        .progress_count(links.len() as u64)
+        .progress_count(topics.len() as u64)
         .flat_map(|post| {
             let mut images = Vec::new();
             let mut seen = HashSet::new();
@@ -86,10 +88,8 @@ fn main() -> Result<()> {
 
                 for post in posts {
                     let id = post.value().attr("id").unwrap();
-                    if seen.contains(id) {
+                    if !seen.insert(id.to_owned()) {
                         break 'outer;
-                    } else {
-                        seen.insert(id.to_owned());
                     }
 
                     let date = post.select(selector!("time")).next().unwrap();
@@ -127,14 +127,18 @@ fn main() -> Result<()> {
                 Err(..) => return None,
             };
 
-            if raw.status() != 200 || raw.header("Content-Type").unwrap() != "image/bmp" {
+            let content = raw.header("Content-Type").unwrap();
+            if raw.status() != 200 || !BMP_TYPES.contains(&content) {
                 return None;
             }
 
             let mut slice = Vec::new();
             raw.into_reader().read_to_end(&mut slice).unwrap();
 
-            let bmp = RawBmp::from_slice(&slice).unwrap();
+            let Ok(bmp) = RawBmp::from_slice(&slice) else {
+                return None;
+            };
+
             if bmp.header().bpp != Bpp::Bits1 || bmp.header().image_size != Size::new(400, 240) {
                 return None;
             }
