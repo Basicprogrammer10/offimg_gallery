@@ -3,6 +3,7 @@
 
 use std::{
     fs::{self, File},
+    io::Write,
     path::Path,
     sync::Arc,
 };
@@ -14,6 +15,7 @@ use serde::Serialize;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
+use zip::ZipWriter;
 
 mod download;
 mod extract;
@@ -34,6 +36,11 @@ fn main() -> Result<()> {
     let images = download::download(OUT_DIR, assets);
     println!("[*] Downloaded {} images", images.len());
 
+    match compress(&images) {
+        Ok(()) => println!("[*] Compressed images"),
+        Err(e) => println!("[!] Failed to compress images: {}", e),
+    };
+
     let date = chrono::offset::Local::now().with_timezone(&Utc);
     let info_file = File::create_new(format!("{OUT_DIR}/info.json"))?;
     serde_json::to_writer(
@@ -43,6 +50,20 @@ fn main() -> Result<()> {
             "images": images
         }),
     )?;
+    Ok(())
+}
+
+fn compress(images: &[ImageRef]) -> Result<()> {
+    let file = File::create(format!("{OUT_DIR}/all.zip"))?;
+    let mut zip = ZipWriter::new(file);
+
+    for i in images {
+        zip.start_file(format!("{}.bmp", i.uuid), Default::default())?;
+        let data = fs::read(format!("{OUT_DIR}/{}.bmp", i.uuid))?;
+        zip.write_all(&data)?;
+    }
+
+    zip.finish()?;
     Ok(())
 }
 
