@@ -1,29 +1,47 @@
-use std::{fs, io::Read, ops::Deref};
+use std::{
+    fs,
+    io::{Cursor, Read},
+    ops::Deref,
+};
 
 use embedded_graphics::prelude::Size;
 use indicatif::ParallelProgressIterator;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use tinybmp::{Bpp, RawBmp};
 use uuid::Uuid;
+use zip::ZipArchive;
 
 use crate::{AssetRef, ImageRef};
 
-const DOWNLOADERS: &[(
-    &[&str],
-    fn(&str, &AssetRef, &mut Box<dyn Read + Send + Sync>) -> Option<ImageRef>,
-)] = &[(BMP_TYPES, download_bitmap)];
+const DOWNLOADERS: &[(&[&str], fn(&str, &AssetRef, &[u8]) -> Option<Vec<ImageRef>>)] =
+    &[(BMP_TYPES, download_bitmap), (ZIP_TYPES, download_zip)];
 
 const BMP_TYPES: &[&str] = &["image/bmp", "image/x-ms-bmp"];
-fn download_bitmap(out_dir: &str, asset: &AssetRef, reader: &mut impl Read) -> Option<ImageRef> {
-    let mut slice = Vec::new();
-    reader.read_to_end(&mut slice).unwrap();
-
-    save_bitmap(out_dir, asset, &slice)
+fn download_bitmap(out_dir: &str, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
+    Some(vec![save_bitmap(out_dir, asset, &slice)?])
 }
 
 const ZIP_TYPES: &[&str] = &["application/zip", "application/octet-stream"];
-fn download_zip(out_dir: &str, asset: &AssetRef, reader: &mut impl Read) -> Option<ImageRef> {
-    todo!()
+fn download_zip(out_dir: &str, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
+    let cursor = Cursor::new(slice);
+    let Ok(mut archive) = ZipArchive::new(cursor) else {
+        return None;
+    };
+
+    let mut images = Vec::new();
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).unwrap();
+        if file.name().ends_with(".bmp") {
+            let mut slice = Vec::new();
+            file.read_to_end(&mut slice).unwrap();
+
+            if let Some(img) = save_bitmap(out_dir, asset, &slice) {
+                images.push(img);
+            }
+        }
+    }
+
+    Some(images)
 }
 
 pub fn download(out_dir: &str, assets: Vec<AssetRef>) -> Vec<ImageRef> {
@@ -35,19 +53,27 @@ pub fn download(out_dir: &str, assets: Vec<AssetRef>) -> Vec<ImageRef> {
                 return None;
             };
 
-            let content = raw.header("Content-Type").unwrap();
+            let content = raw.header("Content-Type").unwrap().to_owned();
             if raw.status() != 200 {
                 return None;
             }
 
+            let mut slice = Vec::new();
+            raw.into_reader().read_to_end(&mut slice).ok()?;
+
             for downloader in DOWNLOADERS {
-                if downloader.0.contains(&content) {
-                    return downloader.1(out_dir, asset, &mut raw.into_reader());
+                if !downloader.0.contains(&content.as_str()) {
+                    continue;
+                }
+
+                if let Some(img) = downloader.1(out_dir, asset, &slice) {
+                    return Some(img);
                 }
             }
 
             None
         })
+        .flatten()
         .collect::<Vec<_>>()
 }
 
