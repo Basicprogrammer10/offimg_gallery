@@ -14,7 +14,7 @@ fetch(`${OFFIMG_PATH}/info.json`)
       INFO_TAG.appendChild(item);
     }
 
-    d.images.sort((a, b) => new Date(b.date) - new Date(a.date));
+    d.images.sort((a, b) => new Date(b.post.date) - new Date(a.post.date));
     IMAGES_TAG.innerHTML = "";
     for (let i of d.images) {
       let image = document.createElement("div");
@@ -22,7 +22,7 @@ fetch(`${OFFIMG_PATH}/info.json`)
 
       {
         let img = document.createElement("img");
-        img.src = `${OFFIMG_PATH}/${i.id}.bmp`;
+        img.src = `${OFFIMG_PATH}/${i.uuid}.bmp`;
         img.alt = i.alt;
         image.appendChild(img);
       }
@@ -32,23 +32,24 @@ fetch(`${OFFIMG_PATH}/info.json`)
         foot.setAttribute("foot", "");
 
         let info = document.createElement("div");
-        info.innerHTML = `${new Date(i.date).toLocaleDateString(
+        info.innerHTML = `${new Date(i.post.date).toLocaleDateString(
           "en-US"
         )} &bull; `;
 
         let post = document.createElement("a");
-        post.href = `https://forum.swissmicros.com/viewtopic.php?t=${i.post}`;
-        post.innerHTML = `Post ${i.post}`;
+        post.href = `https://forum.swissmicros.com/viewtopic.php?t=${i.post.post}`;
+        post.innerHTML = `Post ${i.post.post}`;
         post.target = "_blank";
         post.rel = "noopener noreferrer";
         info.appendChild(post);
 
-        info.innerHTML += ` &bull; ${i.alt}`;
+        if (i.alt) info.innerHTML += ` &bull; ${i.alt}`;
 
         let download = document.createElement("a");
         download.href = `${OFFIMG_PATH}/${i.id}.bmp`;
         download.innerHTML = `⇓`;
-        download.download = `${i.alt}${i.alt.endsWith(".bmp") ? "" : ".bmp"}`;
+        if (i.alt) download.download = `${i.alt}${i.alt.endsWith(".bmp") ? "" : ".bmp"}`;
+        else download.download = `${i.id}.bmp`;
 
         foot.appendChild(info);
         foot.appendChild(download);
