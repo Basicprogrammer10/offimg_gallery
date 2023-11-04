@@ -25,9 +25,10 @@ const BASE_URL: Lazy<Url> = Lazy::new(|| Url::parse("https://forum.swissmicros.c
 const OUT_DIR: &str = "out";
 
 fn main() -> Result<()> {
-    if !Path::new(OUT_DIR).exists() {
-        fs::create_dir(OUT_DIR)?;
+    if Path::new(OUT_DIR).exists() {
+        fs::remove_dir_all(OUT_DIR)?;
     }
+    fs::create_dir(OUT_DIR)?;
 
     let topics = extract::get_topics(&BASE_URL)?;
     println!("[*] Found {} topics", topics.len());
