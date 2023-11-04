@@ -2,7 +2,7 @@ use std::{
     fs,
     io::{Cursor, Read},
     ops::Deref,
-    path::PathBuf,
+    path::Path,
 };
 
 use embedded_graphics::prelude::Size;
@@ -14,18 +14,17 @@ use zip::ZipArchive;
 
 use crate::{AssetRef, ImageRef};
 
-const DOWNLOADERS: &[(
-    &[&str],
-    fn(&PathBuf, &AssetRef, &[u8]) -> Option<Vec<ImageRef>>,
-)] = &[(BMP_TYPES, download_bitmap), (ZIP_TYPES, download_zip)];
+type Downloader = fn(&Path, &AssetRef, &[u8]) -> Option<Vec<ImageRef>>;
+const DOWNLOADERS: &[(&[&str], Downloader)] =
+    &[(BMP_TYPES, download_bitmap), (ZIP_TYPES, download_zip)];
 
 const BMP_TYPES: &[&str] = &["image/bmp", "image/x-ms-bmp"];
-fn download_bitmap(out_dir: &PathBuf, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
-    Some(vec![save_bitmap(out_dir, asset, &slice)?])
+fn download_bitmap(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
+    Some(vec![save_bitmap(out_dir, asset, slice)?])
 }
 
 const ZIP_TYPES: &[&str] = &["application/zip", "application/octet-stream"];
-fn download_zip(out_dir: &PathBuf, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
+fn download_zip(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
     let cursor = Cursor::new(slice);
     let Ok(mut archive) = ZipArchive::new(cursor) else {
         return None;
@@ -47,7 +46,7 @@ fn download_zip(out_dir: &PathBuf, asset: &AssetRef, slice: &[u8]) -> Option<Vec
     Some(images)
 }
 
-pub fn download(out_dir: &PathBuf, assets: Vec<AssetRef>) -> Vec<ImageRef> {
+pub fn download(out_dir: &Path, assets: Vec<AssetRef>) -> Vec<ImageRef> {
     assets
         .par_iter()
         .progress_count(assets.len() as u64)
@@ -80,8 +79,8 @@ pub fn download(out_dir: &PathBuf, assets: Vec<AssetRef>) -> Vec<ImageRef> {
         .collect::<Vec<_>>()
 }
 
-fn save_bitmap(out_dir: &PathBuf, asset: &AssetRef, slice: &[u8]) -> Option<ImageRef> {
-    let Ok(bmp) = RawBmp::from_slice(&slice) else {
+fn save_bitmap(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<ImageRef> {
+    let Ok(bmp) = RawBmp::from_slice(slice) else {
         return None;
     };
 

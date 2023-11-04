@@ -12,8 +12,8 @@ use crate::{
     AssetRef, Post,
 };
 
-const EXTRACTORS: &[fn(&mut Vec<AssetRef>, &Url, ElementRef<'_>, Arc<Post>)] =
-    &[extract_images, extract_zips];
+type Extractor = fn(&mut Vec<AssetRef>, &Url, ElementRef<'_>, Arc<Post>);
+const EXTRACTORS: &[Extractor] = &[extract_images, extract_zips];
 
 fn extract_images(
     assets: &mut Vec<AssetRef>,
@@ -41,7 +41,7 @@ fn extract_zips(
 ) {
     for link in post.select(selector!("a.postlink")) {
         let href = link.value().attr("href").unwrap();
-        let address = base_url.join(&href).unwrap();
+        let address = base_url.join(href).unwrap();
         assets.push(AssetRef {
             post: post_info.clone(),
             address,

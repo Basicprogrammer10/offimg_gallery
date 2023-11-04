@@ -4,7 +4,7 @@
 use std::{
     fs::{self, File},
     io::Write,
-    path::PathBuf,
+    path::Path,
     sync::Arc,
 };
 
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn compress(out_dir: &PathBuf, images: &[ImageRef]) -> Result<()> {
+fn compress(out_dir: &Path, images: &[ImageRef]) -> Result<()> {
     let file = File::create(out_dir.join("all.zip"))?;
     let mut zip = ZipWriter::new(file);
 
