@@ -20,10 +20,14 @@ const DOWNLOADERS: &[(&[&str], Downloader)] =
 
 const BMP_TYPES: &[&str] = &["image/bmp", "image/x-ms-bmp"];
 fn download_bitmap(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
-    Some(vec![save_bitmap(out_dir, asset, slice)?])
+    Some(vec![save_bitmap(out_dir, asset.to_owned(), slice)?])
 }
 
-const ZIP_TYPES: &[&str] = &["application/zip", "application/octet-stream"];
+const ZIP_TYPES: &[&str] = &[
+    "application/zip",
+    "application/octet-stream",
+    "binary/octet-stream",
+];
 fn download_zip(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<Vec<ImageRef>> {
     let cursor = Cursor::new(slice);
     let Ok(mut archive) = ZipArchive::new(cursor) else {
@@ -33,9 +37,16 @@ fn download_zip(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<Vec<Im
     let mut images = Vec::new();
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
-        if file.name().ends_with(".bmp") {
+        let name = file.name().to_owned();
+        if name.ends_with(".bmp") {
             let mut slice = Vec::new();
             file.read_to_end(&mut slice).unwrap();
+
+            let alt = name.rsplit_once('/').map(|x| x.1).unwrap_or(&name);
+            let asset = AssetRef {
+                alt: Some(alt.to_owned()),
+                ..asset.clone()
+            };
 
             if let Some(img) = save_bitmap(out_dir, asset, &slice) {
                 images.push(img);
@@ -79,7 +90,7 @@ pub fn download(out_dir: &Path, assets: Vec<AssetRef>) -> Vec<ImageRef> {
         .collect::<Vec<_>>()
 }
 
-fn save_bitmap(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<ImageRef> {
+fn save_bitmap(out_dir: &Path, asset: AssetRef, slice: &[u8]) -> Option<ImageRef> {
     let Ok(bmp) = RawBmp::from_slice(slice) else {
         return None;
     };
@@ -94,6 +105,6 @@ fn save_bitmap(out_dir: &Path, asset: &AssetRef, slice: &[u8]) -> Option<ImageRe
     Some(ImageRef {
         uuid: id,
         post: asset.post.deref().clone(),
-        alt: asset.alt.clone(),
+        alt: asset.alt,
     })
 }

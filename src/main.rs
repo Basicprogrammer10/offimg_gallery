@@ -1,4 +1,3 @@
-#![feature(file_create_new)]
 #![feature(decl_macro)]
 
 use std::{
@@ -27,10 +26,7 @@ mod util;
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if !args.keep {
-        if args.out_dir.exists() {
-            fs::remove_dir_all(&args.out_dir)?;
-        }
+    if !args.out_dir.exists() {
         fs::create_dir(&args.out_dir)?;
     }
 
@@ -49,7 +45,7 @@ fn main() -> Result<()> {
     }
 
     let date = chrono::offset::Local::now().with_timezone(&Utc);
-    let info_file = File::create_new(args.out_dir.join("info.json"))?;
+    let info_file = File::create(args.out_dir.join("info.json"))?;
     serde_json::to_writer(
         info_file,
         &json!({
@@ -57,6 +53,21 @@ fn main() -> Result<()> {
             "images": images
         }),
     )?;
+
+    if !args.keep {
+        for file in fs::read_dir(&args.out_dir)? {
+            let file = file?;
+            let name = file.file_name();
+            let name = name.to_string_lossy();
+            if file.file_type()?.is_file()
+                && name.ends_with(".bmp")
+                && images.iter().all(|i| name != format!("{}.bmp", i.uuid))
+            {
+                fs::remove_file(file.path())?;
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -74,19 +85,20 @@ fn compress(out_dir: &Path, images: &[ImageRef]) -> Result<()> {
     Ok(())
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Post {
     post: u32,
     date: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone)]
 pub struct AssetRef {
     post: Arc<Post>,
     address: Url,
     alt: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ImageRef {
     post: Post,
     uuid: Uuid,

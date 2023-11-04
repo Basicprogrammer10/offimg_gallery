@@ -17,7 +17,7 @@ pub struct Args {
     #[clap(long)]
     pub no_compress: bool,
 
-    /// Weather to keep the output directory if it already exists
+    /// Weather to keep old downloads when re-downloading
     #[clap(long)]
     pub keep: bool,
 }
