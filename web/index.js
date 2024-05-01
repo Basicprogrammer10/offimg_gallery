@@ -46,10 +46,10 @@ fetch(`${OFFIMG_PATH}/info.json`)
         if (i.alt) info.innerHTML += ` &bull; ${i.alt}`;
 
         let download = document.createElement("a");
-        download.href = `${OFFIMG_PATH}/${i.id}.bmp`;
+        download.href = `${OFFIMG_PATH}/${i.uuid}.bmp`;
         download.innerHTML = `⇓`;
         if (i.alt) download.download = `${i.alt}${i.alt.endsWith(".bmp") ? "" : ".bmp"}`;
-        else download.download = `${i.id}.bmp`;
+        else download.download = `${i.uuid}.bmp`;
 
         foot.appendChild(info);
         foot.appendChild(download);
